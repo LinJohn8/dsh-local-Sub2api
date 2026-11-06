@@ -16,6 +16,7 @@ Sub2API 自身的上游账号、分组、渠道、API Key 等配置仍然在它�
 - 面板顶部状态栏：运行状态、刷新、停止、重启、在系统浏览器中打开。
 - 中文/英文界面文案；跟随 Harness 的浅色/深色外观（内嵌界面会收到主题偏好）。
 - 只监听本机回环地址，不对外网开放，也不依赖任何远程服务器。
+- **适配现有厂商**：栈就绪后会自动把你已有的 OpenAI 兼容厂商（如皮卡丘中转、DSh Our Free Model）作为上游账号接入 Sub2API，开箱即用。
 
 ## 环境要求
 
@@ -55,6 +56,57 @@ Sub2API 自身的上游账号、分组、渠道、API Key 等配置仍然在它�
 ```
 
 修改 `sub2apiPort` / `image` 后，插件下次启动会重建对应容器；`proxyPort` 被占用时插件会自动顺延到下一个空闲端口，并在面板状态里显示实际端口。
+
+## 适配现有厂商（model-vendor adapter）
+
+很多 DeepSeek Harness 用户已经有现成的模型厂商：自家转发的 OpenAI 兼容网关（如 Our Free Model 的本地转发），或第三方中转（如皮卡丘中转 `https://sub.pikaqiu.shop/v1`）。这个插件会在本地 Sub2API 就绪并登录后，**自动把这些厂商作为 Sub2API 的上游账号接入**——你既有账号不错、又能在 Sub2API 统一管理和转发。
+
+接入项通过 `adapterProviders` 配置，每项是一个 OpenAI 兼容端点（`platform: openai` + `type: apikey`，用 `baseUrl` + `apiKey` 透传）。默认内置两项：
+
+```yaml
+adapterProviders:
+  pikaqiu:
+    name: 皮卡丘中转                 # Sub2API 里的账号名（幂等：按名字查重）
+    platform: openai
+    type: apikey
+    baseUrl: https://sub.pikaqiu.shop/v1
+    apiKeySource: refs:PIKAQIU_API_KEY   # 密钥来源，见下
+    concurrency: 3
+    priority: 50
+  our-free-model:
+    name: DSh Our Free Model
+    platform: openai
+    type: apikey
+    baseUrl: http://127.0.0.1:18899/v1   # Our Free Model 本地转发地址
+    apiKeySource: file:openai-gateway\api-key
+    concurrency: 3
+    priority: 50
+```
+
+### 密钥来源（`apiKeySource`）
+
+适配器只在本机解析密钥，**绝不写回插件包或 git**，只通过回环 API 写入本机 Sub2API 数据库。三种写法：
+
+| 写法 | 说明 | 示例 |
+| --- | --- | --- |
+| `env:NAME` | 读环境变量 | `env:PIKAQIU_API_KEY` |
+| `refs:NAME` | 读 DSH 凭据库 `~/.dsh/.credentials.yaml` 的 `refs` 项 | `refs:PIKAQIU_API_KEY` |
+| `file:PATH` | 读一个本地文件的第一行（相对路径基于 `~/.dsh`） | `file:openai-gateway\api-key` |
+
+某个厂商的密钥解析不到时，该厂商会被跳过（状态里显示 `skipped`），**不影响**插件启动和其余厂商的接入。
+
+### 手动触发
+
+栈就绪后会自动接入一次。也可以随时手动触发（例如补上密钥后重试）：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:54922/local-sub2api/action -Method Post -ContentType 'application/json' -Body '{"action":"provision-providers"}' | ConvertTo-Json
+```
+
+### 注意
+
+- **Our Free Model 需要先启用它的本地转发**（设置的 `forward.enabled` 为 `true`），否则 `127.0.0.1:18899` 没有在监听、Sub2API 连不上。默认配置假定端口是 `18899`（被占用时会顺延，请按实际转发端口修改 `baseUrl` 里的端口）。
+- 关闭自动接入可把 `adapterAutoProvision: false`；彻底关闭把 `adapterEnabled: false`。
 
 ## 数据与凭据
 

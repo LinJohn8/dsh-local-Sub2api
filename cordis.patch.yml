@@ -13,3 +13,24 @@
         sub2apiPort: 18080
         proxyPort: 18081
         image: weishaw/sub2api:0.2.19
+        # —— 适配现有厂商 (model-vendor adapter) ——
+        adapterEnabled: true          # 关闭则不再自动把下方厂商接入 Sub2API
+        adapterAutoProvision: true   # 栈就绪并登录后自动接入；false 时用 action=provision-providers 手动触发
+        # adapterSecretBaseDir: ''    # 读取密钥的基准目录，默认 %USERPROFILE%\.dsh
+        adapterProviders:
+          pikaqiu:
+            name: 皮卡丘中转
+            platform: openai
+            type: apikey
+            baseUrl: https://sub.pikaqiu.shop/v1
+            apiKeySource: refs:PIKAQIU_API_KEY
+            concurrency: 3
+            priority: 50
+          our-free-model:
+            name: DSh Our Free Model
+            platform: openai
+            type: apikey
+            baseUrl: http://127.0.0.1:18899/v1
+            apiKeySource: file:openai-gateway\api-key
+            concurrency: 3
+            priority: 50

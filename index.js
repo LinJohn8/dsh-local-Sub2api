@@ -27,6 +27,7 @@ import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import * as adapter from './lib/adapter.js'
 
 export const name = 'local-sub2api'
 export const inject = ['webServer']
@@ -57,6 +58,29 @@ const DEFAULTS = Object.freeze({
   composeTimeoutMs: 600000,
   healthTimeoutMs: 180000,
   stopOnUnload: false,
+  adapterEnabled: true,
+  adapterAutoProvision: true,
+  adapterSecretBaseDir: '',
+  adapterProviders: {
+    pikaqiu: {
+      name: '皮卡丘中转',
+      platform: 'openai',
+      type: 'apikey',
+      baseUrl: 'https://sub.pikaqiu.shop/v1',
+      apiKeySource: 'refs:PIKAQIU_API_KEY',
+      concurrency: 3,
+      priority: 50,
+    },
+    'our-free-model': {
+      name: 'DSh Our Free Model',
+      platform: 'openai',
+      type: 'apikey',
+      baseUrl: 'http://127.0.0.1:18899/v1',
+      apiKeySource: 'file:openai-gateway\\api-key',
+      concurrency: 3,
+      priority: 50,
+    },
+  },
 })
 
 function normalizeConfig(raw) {
@@ -89,7 +113,54 @@ function normalizeConfig(raw) {
   cfg.timezone = typeof cfg.timezone === 'string' && cfg.timezone.trim() !== ''
     ? cfg.timezone.trim()
     : systemTimezone()
+
+  // ---- model-vendor adapter ----
+  cfg.adapterEnabled = cfg.adapterEnabled !== false
+  cfg.adapterAutoProvision = cfg.adapterAutoProvision !== false
+  cfg.adapterSecretBaseDir = typeof cfg.adapterSecretBaseDir === 'string' && cfg.adapterSecretBaseDir.trim() !== ''
+    ? cfg.adapterSecretBaseDir.trim()
+    : path.join(process.env.DSH_HOME || path.join(os.homedir(), '.dsh'))
+  cfg.adapterProvidersList = normalizeAdapterProviders(cfg.adapterProviders)
   return cfg
+}
+
+/**
+ * Normalize the adapterProviders config into a stable ordered list. Accepts
+ * either an object keyed by logical id, or an array. Each entry is validated and
+ * given safe defaults; entries without a name or baseUrl are skipped. apiKeySource
+ * may be `env:NAME`, `file:PATH`, or `refs:NAME`.
+ */
+function normalizeAdapterProviders(raw) {
+  const entries = []
+  const push = (id, value) => {
+    if (!value || typeof value !== 'object') return
+    const name = typeof value.name === 'string' && value.name.trim() !== '' ? value.name.trim() : String(id)
+    const baseUrl = typeof value.baseUrl === 'string' && value.baseUrl.trim() !== '' ? value.baseUrl.trim() : ''
+    const platform = typeof value.platform === 'string' && value.platform.trim() !== '' ? value.platform.trim() : 'openai'
+    const type = typeof value.type === 'string' && value.type.trim() !== '' ? value.type.trim() : 'apikey'
+    const apiKeySource = typeof value.apiKeySource === 'string' && value.apiKeySource.trim() !== ''
+      ? value.apiKeySource.trim()
+      : (value.apiKey ? `refs:${value.apiKey}` : '')
+    if (!baseUrl) return
+    entries.push({
+      id,
+      name,
+      platform,
+      type,
+      baseUrl,
+      apiKeySource,
+      concurrency: Number.isInteger(value.concurrency) ? value.concurrency : 3,
+      priority: Number.isInteger(value.priority) ? value.priority : 50,
+      group_ids: Array.isArray(value.group_ids) ? value.group_ids.filter(Number.isInteger) : [],
+      credentials: value.credentials && typeof value.credentials === 'object' ? value.credentials : {},
+    })
+  }
+  if (Array.isArray(raw)) {
+    for (const item of raw) push(item && item.id, item && item.value ? item.value : item)
+  } else if (raw && typeof raw === 'object') {
+    for (const [id, value] of Object.entries(raw)) push(id, value)
+  }
+  return entries
 }
 
 function systemTimezone() {
@@ -190,7 +261,7 @@ function runProcess(command, args, options = {}) {
 }
 
 function httpJson(url, options = {}) {
-  const { method = 'GET', body, timeoutMs = 15000 } = options
+  const { method = 'GET', body, timeoutMs = 15000, headers: extraHeaders } = options
   return new Promise((resolve, reject) => {
     const payload = body === undefined ? undefined : Buffer.from(JSON.stringify(body))
     const target = new URL(url)
@@ -201,6 +272,7 @@ function httpJson(url, options = {}) {
       method,
       headers: {
         accept: 'application/json',
+        ...(extraHeaders || {}),
         ...(payload
           ? { 'content-type': 'application/json', 'content-length': String(payload.length) }
           : {}),
@@ -346,6 +418,7 @@ export function apply(ctx, rawConfig) {
     autoLogin: false,
     proxyPort: null,
     proxyUrl: null,
+    adapter: { enabled: cfg.adapterEnabled, done: false, running: false, lastRunAt: null, summary: null, providers: [] },
     version: 1,
   }
 
@@ -524,6 +597,67 @@ export function apply(ctx, rawConfig) {
     throw new Error(`Sub2API is up but the local admin login failed: ${lastDetail}`)
   }
 
+  // ---------------------------------------------------------------------------
+  // model-vendor adapter (适配现有厂商): provision configured upstream accounts
+  // ---------------------------------------------------------------------------
+
+  let adapterPromise = null
+
+  /**
+   * Provision every configured provider as an idempotent Sub2API account.
+   * Individual provider failures (e.g. missing API key) are reported in the
+   * result but never let this function throw — the plugin must not fail because
+   * a third-party key is absent.
+   */
+  async function provisionProviders() {
+    if (!cfg.adapterEnabled) {
+      setState({ adapter: { enabled: false, done: true, running: false, lastRunAt: Date.now(), summary: { disabled: true }, providers: cfg.adapterProvidersList } })
+      return null
+    }
+    if (adapterPromise) return adapterPromise
+    adapterPromise = (async () => {
+      setState({ adapter: { enabled: true, running: true, lastRunAt: Date.now(), done: false, summary: null, providers: cfg.adapterProvidersList } })
+      try {
+        const session = await loginAdmin(true)
+        const api = {
+          base: () => upstreamBase(),
+          login: () => Promise.resolve(session),
+        }
+        const results = await adapter.provisionAll({ config: cfg, api, httpJson, log })
+        const summary = adapter.statusSummary(results)
+        setState({
+          adapter: {
+            enabled: true,
+            running: false,
+            done: true,
+            lastRunAt: Date.now(),
+            summary,
+            providers: cfg.adapterProvidersList,
+          },
+        })
+        log('info', `adapter provision done: ${summary.created.length} created, ${summary.existed.length} existing, ${summary.skipped.length} skipped, ${summary.failed.length} failed`)
+        return results
+      } catch (error) {
+        const message = error && error.message ? error.message : String(error)
+        setState({
+          adapter: {
+            enabled: true,
+            running: false,
+            done: false,
+            lastRunAt: Date.now(),
+            summary: { error: message },
+            providers: cfg.adapterProvidersList,
+          },
+        })
+        log('warn', 'adapter provision failed', error)
+        return null
+      } finally {
+        adapterPromise = null
+      }
+    })()
+    return adapterPromise
+  }
+
   async function startStack() {
     if (!cfg.enabled) {
       setState({ phase: 'disabled', message: 'Disabled in configuration' })
@@ -551,6 +685,9 @@ export function apply(ctx, rawConfig) {
         readyAt: Date.now(),
       })
       log('info', `Sub2API ready on ${upstreamBase()}`)
+      if (cfg.adapterEnabled && cfg.adapterAutoProvision && cfg.adapterProvidersList.length > 0) {
+        provisionProviders().catch(() => {})
+      }
     } catch (error) {
       const message = error && error.message ? error.message : String(error)
       setState({ phase: 'error', message: 'Local Sub2API could not start', error: message, hint: hintForError(message) })
@@ -600,6 +737,9 @@ export function apply(ctx, rawConfig) {
         await waitForHealth()
         await waitForLogin()
         setState({ phase: 'ready', message: 'Local Sub2API is running', readyAt: Date.now(), error: null, hint: null })
+        if (cfg.adapterEnabled && cfg.adapterAutoProvision && cfg.adapterProvidersList.length > 0) {
+          provisionProviders().catch(() => {})
+        }
       } catch (error) {
         const message = error && error.message ? error.message : String(error)
         setState({ phase: 'error', message: 'Local Sub2API could not restart', error: message, hint: hintForError(message) })
@@ -809,11 +949,25 @@ export function apply(ctx, rawConfig) {
       proxyUrl: state.proxyUrl,
       image: cfg.image,
       runMode: cfg.runMode,
-      pluginVersion: 2,
+      pluginVersion: 3,
       dataDir: cfg.dataDir,
       startedAt: state.startedAt,
       readyAt: state.readyAt,
       updatedAt: state.updatedAt,
+      adapter: {
+        enabled: cfg.adapterEnabled,
+        autoProvision: cfg.adapterAutoProvision,
+        running: !!state.adapter.running,
+        done: !!state.adapter.done,
+        lastRunAt: state.adapter.lastRunAt,
+        summary: state.adapter.summary,
+        providers: cfg.adapterProvidersList.map((p) => ({
+          id: p.id,
+          name: p.name,
+          baseUrl: p.baseUrl,
+          apiKeySource: p.apiKeySource,
+        })),
+      },
     }
   }
 
@@ -840,6 +994,17 @@ export function apply(ctx, rawConfig) {
     if (action === 'stop') {
       stopStack().catch(() => {})
       sendJson(response, 202, statusPayload())
+      return
+    }
+    if (action === 'provision-providers') {
+      provisionProviders().then((results) => {
+        sendJson(response, 200, {
+          ...statusPayload(),
+          provisioned: results || null,
+        })
+      }).catch((error) => {
+        sendJson(response, 500, { error: String(error && error.message ? error.message : error) })
+      })
       return
     }
     sendJson(response, 400, { error: `unknown action: ${action || '(empty)'}` })
