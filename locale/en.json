@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Local Sub2api",
+    "description": "Runs a local Sub2API gateway (Sub2API + PostgreSQL + Redis in Docker) alongside DeepSeek Harness and opens its admin console in a sidebar panel, logged in automatically."
+  }
+}

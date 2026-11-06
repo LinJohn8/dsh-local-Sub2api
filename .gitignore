@@ -1,0 +1,17 @@
+# Runtime secrets & data — never commit these
+.env
+.data/
+data/
+*.env.local
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log

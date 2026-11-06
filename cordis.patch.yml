@@ -1,0 +1,15 @@
+# Bundle patch: one Host row; the `dsh.client` declaration mounts the Client half
+# that adds the sidebar panel and its console view.
+#
+# Every value below is the row's default; override this id in the profile's
+# cordis.patch.yml to change it.
+- insert:
+    - id: local-sub2api
+      name: dsh-local-sub2api
+      config:
+        enabled: true
+        autoStart: true
+        autoStartDocker: true
+        sub2apiPort: 18080
+        proxyPort: 18081
+        image: weishaw/sub2api:0.2.19

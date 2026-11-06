@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "本地 Sub2api",
+    "description": "随 DeepSeek Harness 一起启动本地 Sub2API 网关（Docker 中的 Sub2API + PostgreSQL + Redis），并在侧边栏面板中免登录打开其管理界面。"
+  }
+}
