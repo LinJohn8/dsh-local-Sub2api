@@ -16,7 +16,7 @@ Sub2API 自身的上游账号、分组、渠道、API Key 等配置仍然在它�
 - 面板顶部状态栏：运行状态、刷新、停止、重启、在系统浏览器中打开。
 - 中文/英文界面文案；跟随 Harness 的浅色/深色外观（内嵌界面会收到主题偏好）。
 - 只监听本机回环地址，不对外网开放，也不依赖任何远程服务器。
-- **适配现有厂商**：栈就绪后会自动把你已有的 OpenAI 兼容厂商（如皮卡丘中转、DSh Our Free Model）作为上游账号接入 Sub2API，开箱即用。
+- **适配现有厂商**：栈就绪后会自动把你已有的 OpenAI 兼容厂商（如皮卡丘中转、DSh Our Free Model、Qoder 中国版免费 Qwen3.8-Flash）作为上游账号接入 Sub2API，开箱即用。
 
 ## 环境要求
 
@@ -36,6 +36,17 @@ Sub2API 自身的上游账号、分组、渠道、API Key 等配置仍然在它�
 4. 在 Sub2API 界面里添加上游账号/分组/API Key。
 5. 本机其它程序使用 Sub2API 提供的接口时，地址是 `http://127.0.0.1:18080`（例如 OpenAI 兼容接口 `http://127.0.0.1:18080/v1`），Key 用界面里创建的 `sk-...`。
 
+## 设置页（推荐）
+
+打开 **设置 → 本地 Sub2api**，有两个开关：
+
+| 开关 | 作用 | 默认 |
+| --- | --- | --- |
+| **服务开关** | 立刻启动 / 停止本地 Sub2API 服务，并显示当前是「运行中」还是「已停止」 | 停止（不自动起） |
+| **打开 Harness 时自动启动** | 记录下次打开 DeepSeek Harness 时是否自动拉起服务 | **关** |
+
+两个开关都持久化在 `<dataDir>/preferences.json`，**不需要改 YAML、不用重载插件**。设置页里的开关优先于 `cordis.patch.yml` 的 `autoStart`；想恢复「以 YAML 为准」，删掉 `preferences.json` 即可。
+
 ## 配置
 
 插件行 id 是 `local-sub2api`。在 Harness 配置目录的 `cordis.patch.yml`（本机为 `C:\Users\86158\.dsh\cordis.patch.yml` 或对应 profile 的 `cordis.patch.yml`）里覆盖同 id 行即可：
@@ -43,7 +54,7 @@ Sub2API 自身的上游账号、分组、渠道、API Key 等配置仍然在它�
 ```yaml
 - id: local-sub2api
   config:
-    autoStart: true            # 随 Harness 自动启动本地服务
+    autoStart: false           # 随 Harness 自动启动本地服务（默认关闭）
     autoStartDocker: true      # Docker Desktop 未运行时尝试自动启动
     sub2apiPort: 18080         # Sub2API 本机端口
     proxyPort: 18081           # 内嵌面板使用的本地代理端口
@@ -61,7 +72,7 @@ Sub2API 自身的上游账号、分组、渠道、API Key 等配置仍然在它�
 
 很多 DeepSeek Harness 用户已经有现成的模型厂商：自家转发的 OpenAI 兼容网关（如 Our Free Model 的本地转发），或第三方中转（如皮卡丘中转 `https://sub.pikaqiu.shop/v1`）。这个插件会在本地 Sub2API 就绪并登录后，**自动把这些厂商作为 Sub2API 的上游账号接入**——你既有账号不错、又能在 Sub2API 统一管理和转发。
 
-接入项通过 `adapterProviders` 配置，每项是一个 OpenAI 兼容端点（`platform: openai` + `type: apikey`，用 `baseUrl` + `apiKey` 透传）。默认内置两项：
+接入项通过 `adapterProviders` 配置，每项是一个 OpenAI 兼容端点（`platform: openai` + `type: apikey`，用 `baseUrl` + `apiKey` 透传）。默认内置三项：
 
 ```yaml
 adapterProviders:
@@ -77,11 +88,25 @@ adapterProviders:
     name: DSh Our Free Model
     platform: openai
     type: apikey
-    baseUrl: http://127.0.0.1:18899/v1   # Our Free Model 本地转发地址
+    # 容器内要访问宿主机回环网关，必须用 host.docker.internal（127.0.0.1 是容器自己）
+    baseUrl: http://host.docker.internal:8326/v1
+    apiKeySource: file:openai-gateway\api-key
+    concurrency: 3
+    priority: 50
+  qodercn:
+    name: Qoder CN Qwen3.8-Flash     # Qoder 中国版免费 Qwen3.8-Flash
+    platform: openai
+    type: apikey
+    baseUrl: http://host.docker.internal:8326/v1
     apiKeySource: file:openai-gateway\api-key
     concurrency: 3
     priority: 50
 ```
+
+> **默认账号说明**
+> - `our-free-model` 与 `qodercn` 都复用本机 channel-pack 的同一个 OpenAI 兼容网关（宿主机回环 `8326`，可用 `DSH_OPENAI_GATEWAY_PORT` 覆盖；密钥文件 `~/.dsh/openai-gateway/api-key`）。Sub2API 容器通过 Docker Desktop 的 `host.docker.internal` 访问它。
+> - `qodercn` 就是 **Qoder 中国版（qoder.cn）的免费 Qwen3.8-Flash**：它在 channel pack 里是 `qfmodel`（`isFree=true`、`priceFactor=0`，不消耗积分、不限流），网关对外模型名是 **`qodercn/qfmodel`**——在 Sub2API 里用这个账号调用时，`model` 要填 `qodercn/qfmodel`。
+
 
 ### 密钥来源（`apiKeySource`）
 

@@ -8,7 +8,9 @@
       name: dsh-local-sub2api
       config:
         enabled: true
-        autoStart: true
+        # 打开 DeepSeek Harness 时是否自动启动本地 Sub2API。默认关闭：
+        # 需要用时在设置页 / 侧边栏面板里把运行开关打开即可。
+        autoStart: false
         autoStartDocker: true
         sub2apiPort: 18080
         proxyPort: 18081
@@ -30,7 +32,17 @@
             name: DSh Our Free Model
             platform: openai
             type: apikey
-            baseUrl: http://127.0.0.1:18899/v1
+            # 容器内要访问宿主机回环网关卡，用 host.docker.internal（见 index.js 注释）。
+            baseUrl: http://host.docker.internal:8326/v1
+            apiKeySource: file:openai-gateway\api-key
+            concurrency: 3
+            priority: 50
+          qodercn:
+            # Qoder 中国版免费 Qwen3.8-Flash（内部 id qfmodel），网关模型名 qodercn/qfmodel。
+            name: Qoder CN Qwen3.8-Flash
+            platform: openai
+            type: apikey
+            baseUrl: http://host.docker.internal:8326/v1
             apiKeySource: file:openai-gateway\api-key
             concurrency: 3
             priority: 50

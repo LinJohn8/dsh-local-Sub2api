@@ -48,6 +48,23 @@ window.__ModuleLoader__.load({
         'hint.console': 'If the console keeps loading, press Reload. Service logs: docker logs dsh-local-sub2api',
         'error.statusUnavailable': 'The Harness status endpoint is unavailable.',
         'error.actionFailed': 'The action failed.',
+        'settings.title': 'Local Sub2api',
+        'settings.desc': 'A private Sub2API stack (Sub2API + PostgreSQL + Redis in Docker) that runs alongside DeepSeek Harness.',
+        'settings.run': 'Service',
+        'settings.runDesc': 'Whether the local Sub2API stack is running right now.',
+        'settings.runOn': 'Running',
+        'settings.runOff': 'Stopped',
+        'settings.runToggle': 'Turn the service on or off',
+        'settings.autoStart': 'Start with DeepSeek Harness',
+        'settings.autoStartDesc': 'Start the stack automatically whenever DeepSeek Harness opens. Off by default; the stack keeps Docker busy, so start it manually when you need it.',
+        'settings.autoStartOn': 'On',
+        'settings.autoStartOff': 'Off',
+        'settings.autoStartToggle': 'Start automatically on the next launch',
+        'settings.state': 'Current state',
+        'settings.busy': 'Working…',
+        'settings.saved': 'Saved',
+        'settings.port': 'Service port',
+        'settings.proxy': 'Console proxy',
       },
       zh: {
         title: 'Local Sub2api',
@@ -77,6 +94,23 @@ window.__ModuleLoader__.load({
         'hint.console': '如果界面一直加载，请点击刷新。服务日志：docker logs dsh-local-sub2api',
         'error.statusUnavailable': '无法访问 Harness 状态接口。',
         'error.actionFailed': '操作失败。',
+        'settings.title': 'Local Sub2api',
+        'settings.desc': '随 DeepSeek Harness 一起使用的本地 Sub2API 网关（Docker 中的 Sub2API + PostgreSQL + Redis）。',
+        'settings.run': '服务开关',
+        'settings.runDesc': '本地 Sub2API 服务当前是否在运行。',
+        'settings.runOn': '运行中',
+        'settings.runOff': '已停止',
+        'settings.runToggle': '开启或关闭服务',
+        'settings.autoStart': '打开 Harness 时自动启动',
+        'settings.autoStartDesc': '每次打开 DeepSeek Harness 时自动启动本地 Sub2API。默认关闭：该服务会持续占用 Docker，需要时再手动开启即可。',
+        'settings.autoStartOn': '开',
+        'settings.autoStartOff': '关',
+        'settings.autoStartToggle': '下次启动时自动运行',
+        'settings.state': '当前状态',
+        'settings.busy': '处理中…',
+        'settings.saved': '已保存',
+        'settings.port': '服务端口',
+        'settings.proxy': '管理界面代理',
       },
     }
 
@@ -105,6 +139,23 @@ window.__ModuleLoader__.load({
       '.dsh-ls2a-spinner{width:26px;height:26px;border-radius:50%;border:3px solid var(--dsw-alias-border-l2);border-top-color:var(--dsw-alias-state-warn-primary);animation:dsh-ls2a-spin .9s linear infinite}',
       '@keyframes dsh-ls2a-spin{to{transform:rotate(360deg)}}',
       '.dsh-ls2a-foot{flex:none;display:flex;gap:14px;padding:4px 12px;border-top:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);font-size:11px;background:var(--dsw-alias-bg-layer-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      // --- settings page ---
+      '.dsh-ls2a-set{display:flex;flex-direction:column;gap:14px;padding:4px 2px;max-width:760px;font-size:13px;color:var(--dsw-alias-label-primary)}',
+      '.dsh-ls2a-set-desc{color:var(--dsw-alias-label-secondary);line-height:1.5}',
+      '.dsh-ls2a-set-row{display:flex;align-items:flex-start;gap:16px;padding:14px 16px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1)}',
+      '.dsh-ls2a-set-row-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}',
+      '.dsh-ls2a-set-row-title{font-weight:600}',
+      '.dsh-ls2a-set-row-desc{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.5}',
+      '.dsh-ls2a-set-row-side{flex:none;display:flex;align-items:center;gap:10px;padding-top:2px}',
+      '.dsh-ls2a-switch{position:relative;appearance:none;flex:none;width:40px;height:22px;border-radius:999px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);cursor:pointer;transition:background .15s ease,border-color .15s ease;padding:0}',
+      '.dsh-ls2a-switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .15s ease,background .15s ease}',
+      '.dsh-ls2a-switch[data-on="true"]{background:var(--dsw-alias-brand-primary);border-color:transparent}',
+      '.dsh-ls2a-switch[data-on="true"]::after{transform:translateX(18px);background:#fff}',
+      '.dsh-ls2a-switch:disabled{opacity:.5;cursor:default}',
+      '.dsh-ls2a-switch-label{font-size:12px;color:var(--dsw-alias-label-secondary);white-space:nowrap;min-width:3.5em;text-align:right}',
+      '.dsh-ls2a-set-state{display:inline-flex;align-items:center;gap:7px;padding:2px 10px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:12px;white-space:nowrap}',
+      '.dsh-ls2a-set-meta{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--dsw-alias-label-secondary);font-size:12px}',
+      '.dsh-ls2a-set-err{color:var(--dsw-alias-state-error-primary);font-size:12px;white-space:pre-wrap;word-break:break-word}',
     ].join('\n')
 
     const ICON_PATH = 'M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v1A2.5 2.5 0 0 1 17.5 11h-11A2.5 2.5 0 0 1 4 8.5v-1Z'
@@ -334,6 +385,129 @@ window.__ModuleLoader__.load({
       return t('subtitle')
     }
 
+    /**
+     * The settings page. Two switches, both persisted by the Host:
+     *   - 「服务开关」 controls the stack right now (start/stop);
+     *   - 「打开 Harness 时自动启动」 records what the next launch should do.
+     * It also reports the live phase so the user can tell at a glance whether
+     * the service is currently up.
+     */
+    function createSettingsSection(t) {
+      return function LocalSub2apiSettings() {
+        const [status, setStatus] = React.useState(null)
+        const [statusError, setStatusError] = React.useState(null)
+        const [actionError, setActionError] = React.useState(null)
+        const [busy, setBusy] = React.useState(null)
+        const statusRef = React.useRef(null)
+        statusRef.current = status
+
+        const refresh = React.useCallback(async () => {
+          try {
+            const response = await fetch(statusUrl(), { headers: { accept: 'application/json' }, cache: 'no-store' })
+            if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            setStatus(await response.json())
+            setStatusError(null)
+          } catch (error) {
+            setStatusError(error && error.message ? error.message : String(error))
+          }
+        }, [])
+
+        React.useEffect(() => {
+          let cancelled = false
+          let timer = 0
+          const tick = async () => {
+            if (cancelled) return
+            await refresh()
+            if (cancelled) return
+            const phase = statusRef.current && statusRef.current.phase
+            timer = window.setTimeout(tick, phase === 'ready' ? POLL_READY_MS : POLL_STARTING_MS)
+          }
+          tick()
+          return () => {
+            cancelled = true
+            if (timer) window.clearTimeout(timer)
+          }
+        }, [refresh])
+
+        const runAction = React.useCallback(async (action, extra) => {
+          setBusy(action)
+          setActionError(null)
+          try {
+            const response = await fetch(actionUrl(), {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', accept: 'application/json' },
+              body: JSON.stringify({ action, ...(extra || {}) }),
+            })
+            if (!response.ok) {
+              let detail = `HTTP ${response.status}`
+              try {
+                const data = await response.json()
+                if (data && data.error) detail = data.error
+              } catch {}
+              throw new Error(detail)
+            }
+            const data = await response.json()
+            if (data && data.phase) setStatus(data)
+            await refresh()
+          } catch (error) {
+            setActionError(error && error.message ? error.message : String(error))
+          } finally {
+            setBusy(null)
+          }
+        }, [refresh])
+
+        const phase = status && status.phase ? status.phase : (statusError ? 'error' : 'idle')
+        // 「运行中」 follows the live phase; a starting/restarting stack counts as
+        // wanted-on so the switch does not flip back while it boots.
+        const running = phase === 'ready' || phase === 'starting'
+        const autoStart = status ? status.autoStart === true : false
+        const canToggle = status !== null && phase !== 'disabled'
+        const disabled = busy !== null || !canToggle
+
+        const switchEl = (on, onToggle, labelOn, labelOff, key) => h('div', { className: 'dsh-ls2a-set-row-side' },
+          h('span', { className: 'dsh-ls2a-switch-label' }, on ? labelOn : labelOff),
+          h('button', {
+            key,
+            type: 'button',
+            className: 'dsh-ls2a-switch',
+            'data-on': on ? 'true' : 'false',
+            disabled,
+            role: 'switch',
+            'aria-checked': on ? 'true' : 'false',
+            onClick: onToggle,
+          }))
+
+        return h(React.Fragment, null,
+          h('style', null, CSS),
+          h('div', { className: 'dsh-ls2a-set' },
+            h('div', { className: 'dsh-ls2a-set-desc' }, t('settings.desc')),
+
+            h('div', { className: 'dsh-ls2a-set-row' },
+              h('div', { className: 'dsh-ls2a-set-row-main' },
+                h('div', { className: 'dsh-ls2a-set-row-title' }, t('settings.run')),
+                h('div', { className: 'dsh-ls2a-set-row-desc' }, t('settings.runDesc')),
+                statusError ? h('div', { className: 'dsh-ls2a-set-err' }, `${t('error.statusUnavailable')} (${statusError})`) : null,
+                actionError ? h('div', { className: 'dsh-ls2a-set-err' }, `${t('error.actionFailed')} ${actionError}`) : null),
+              switchEl(running, () => runAction('set-runtime', { on: !running }), t('settings.runOn'), t('settings.runOff'), 'run')),
+
+            h('div', { className: 'dsh-ls2a-set-row' },
+              h('div', { className: 'dsh-ls2a-set-row-main' },
+                h('div', { className: 'dsh-ls2a-set-row-title' }, t('settings.autoStart')),
+                h('div', { className: 'dsh-ls2a-set-row-desc' }, t('settings.autoStartDesc'))),
+              switchEl(autoStart, () => runAction('set-auto-start', { on: !autoStart }), t('settings.autoStartOn'), t('settings.autoStartOff'), 'auto')),
+
+            h('div', { className: 'dsh-ls2a-set-meta' },
+              h('span', { className: 'dsh-ls2a-set-state' },
+                h('span', { className: 'dsh-ls2a-dot', 'data-phase': phase }),
+                h('span', null, `${t('settings.state')}：${phaseLabel(t, phase)}`)),
+              busy ? h('span', null, t('settings.busy')) : null,
+              status && status.sub2apiPort ? h('span', null, `${t('settings.port')} ${status.sub2apiPort}`) : null,
+              status && status.proxyPort ? h('span', null, `${t('settings.proxy')} ${status.proxyPort}`) : null),
+            status && status.error ? h('div', { className: 'dsh-ls2a-error' }, status.error) : null,
+            status && status.hint ? h('div', { className: 'dsh-ls2a-hint' }, status.hint) : null))
+      }
+    }
+
     return {
       inject: ['slots', 'locale'],
       apply(ctx) {
@@ -353,6 +527,15 @@ window.__ModuleLoader__.load({
           key: 'local-sub2api',
           locale: NS,
         }, createPanel(t)))
+
+        // Settings → 本地 Sub2api：the two switches the user asked for.
+        ctx.slots.inject('settings.section', () => ctx.slots.register({
+          name: 'settings.section',
+          id: 'local-sub2api',
+          order: 36,
+          label: () => t('settings.title'),
+          locale: NS,
+        }, createSettingsSection(t)))
       },
     }
   },

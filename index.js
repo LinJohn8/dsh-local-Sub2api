@@ -44,7 +44,11 @@ const TOKEN_TTL_MS = 5 * 60 * 1000
 
 const DEFAULTS = Object.freeze({
   enabled: true,
-  autoStart: true,
+  // Whether opening DeepSeek Harness brings the stack up by itself. Off by
+  // default: the stack keeps Docker Desktop busy, so the user opts in with the
+  // runtime switch in the panel (or in Settings) instead of paying for it on
+  // every launch.
+  autoStart: false,
   autoStartDocker: true,
   sub2apiPort: DEFAULT_SUB2API_PORT,
   proxyPort: DEFAULT_PROXY_PORT,
@@ -75,7 +79,25 @@ const DEFAULTS = Object.freeze({
       name: 'DSh Our Free Model',
       platform: 'openai',
       type: 'apikey',
-      baseUrl: 'http://127.0.0.1:18899/v1',
+      // The vendored channel pack serves every absorbed channel through one
+      // OpenAI-compatible gateway bound to the host loopback (port 8326, or
+      // DSH_OPENAI_GATEWAY_PORT). Sub2API relays from *inside its container*,
+      // where 127.0.0.1 is the container itself — Docker Desktop publishes the
+      // host loopback as host.docker.internal, so that is the address used here.
+      baseUrl: 'http://host.docker.internal:8326/v1',
+      apiKeySource: 'file:openai-gateway\\api-key',
+      concurrency: 3,
+      priority: 50,
+    },
+    qodercn: {
+      // Qoder 中国版（qoder.cn）的免费 Qwen3.8-Flash。它在 channel pack 里的
+      // 内部 id 是 `qfmodel`（isFree=true / priceFactor=0，不消耗积分），由同一个
+      // 宿主机 OpenAI 网关按 `/v1/models` 里的 `qodercn/qfmodel` 暴露。
+      // 接入 Sub2API 后，客户端把 model 选成 `qodercn/qfmodel` 即可。
+      name: 'Qoder CN Qwen3.8-Flash',
+      platform: 'openai',
+      type: 'apikey',
+      baseUrl: 'http://host.docker.internal:8326/v1',
       apiKeySource: 'file:openai-gateway\\api-key',
       concurrency: 3,
       priority: 50,
@@ -91,7 +113,8 @@ function normalizeConfig(raw) {
     return Math.min(max, Math.max(min, Math.trunc(n)))
   }
   cfg.enabled = cfg.enabled !== false
-  cfg.autoStart = cfg.autoStart !== false
+  // opt-in: only an explicit true turns it on (absent stays off, as shipped).
+  cfg.autoStart = cfg.autoStart === true
   cfg.autoStartDocker = cfg.autoStartDocker !== false
   cfg.stopOnUnload = cfg.stopOnUnload === true
   cfg.sub2apiPort = int(cfg.sub2apiPort, DEFAULT_SUB2API_PORT, 1, 65535)
@@ -416,6 +439,7 @@ export function apply(ctx, rawConfig) {
     dockerAvailable: false,
     dockerStarting: false,
     autoLogin: false,
+    autoStart: cfg.autoStart,
     proxyPort: null,
     proxyUrl: null,
     adapter: { enabled: cfg.adapterEnabled, done: false, running: false, lastRunAt: null, summary: null, providers: [] },
@@ -424,6 +448,11 @@ export function apply(ctx, rawConfig) {
 
   const composePath = path.join(cfg.dataDir, 'docker-compose.local.yml')
   const envPath = path.join(cfg.dataDir, '.env')
+  // The settings page's own state. It lives beside the stack (not in the
+  // profile config) so toggling it never rewrites the user's YAML and takes
+  // effect on the next launch without a plugin remount.
+  const prefsPath = path.join(cfg.dataDir, 'preferences.json')
+  let prefs = { autoStart: cfg.autoStart }
   let envValues = null
   let authSession = null
   let authFetchedAt = 0
@@ -436,6 +465,41 @@ export function apply(ctx, rawConfig) {
   }
 
   const upstreamBase = () => `http://127.0.0.1:${cfg.sub2apiPort}`
+
+  // ---------------------------------------------------------------------------
+  // preferences (the settings page's persisted switches)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Load the persisted switches. A missing or malformed file keeps the shipped
+   * defaults: this runs on every activation, so a hand-damaged file must never
+   * stop the plugin from mounting.
+   */
+  async function loadPreferences() {
+    try {
+      const raw = await fsp.readFile(prefsPath, 'utf8')
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        prefs = {
+          autoStart: parsed.autoStart === true,
+          // An explicit runtime stop survives a reload: the stack stays down
+          // until the user turns it back on.
+          runtimeOn: parsed.runtimeOn !== false,
+        }
+        state.autoStart = prefs.autoStart
+      }
+    } catch { /* first run, or a file we cannot read: keep the defaults */ }
+  }
+
+  /** Persist the switches; never throws into the caller's action path. */
+  async function savePreferences() {
+    try {
+      await fsp.mkdir(cfg.dataDir, { recursive: true })
+      await fsp.writeFile(prefsPath, `${JSON.stringify(prefs, null, 2)}\n`, 'utf8')
+    } catch (error) {
+      log('warn', 'could not persist preferences', error)
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // runtime directory
@@ -954,6 +1018,10 @@ export function apply(ctx, rawConfig) {
       startedAt: state.startedAt,
       readyAt: state.readyAt,
       updatedAt: state.updatedAt,
+      // Settings-page switches: `autoStart` is the launch preference,
+      // `runtimeOn` is whether the user wants the service up right now.
+      autoStart: prefs.autoStart,
+      runtimeOn: prefs.runtimeOn !== false,
       adapter: {
         enabled: cfg.adapterEnabled,
         autoProvision: cfg.adapterAutoProvision,
@@ -1007,6 +1075,30 @@ export function apply(ctx, rawConfig) {
       })
       return
     }
+    if (action === 'set-auto-start') {
+      // Launch preference only: it decides what the next Harness start does and
+      // never touches the stack that is running now.
+      prefs = { ...prefs, autoStart: payload.on === true }
+      state.autoStart = prefs.autoStart
+      await savePreferences()
+      sendJson(response, 200, statusPayload())
+      return
+    }
+    if (action === 'set-runtime') {
+      // The on/off switch: start brings the stack up and marks it as wanted,
+      // stop brings it down and remembers the user does not want it up.
+      const on = payload.on === true
+      prefs = { ...prefs, runtimeOn: on }
+      await savePreferences()
+      if (on) {
+        ensureStack({ force: true }).catch(() => {})
+        sendJson(response, 202, statusPayload())
+      } else {
+        stopStack().catch(() => {})
+        sendJson(response, 202, statusPayload())
+      }
+      return
+    }
     sendJson(response, 400, { error: `unknown action: ${action || '(empty)'}` })
   }
 
@@ -1057,12 +1149,26 @@ export function apply(ctx, rawConfig) {
     }
   }, 'local-sub2api: proxy server')
 
-  if (cfg.enabled && cfg.autoStart) {
-    setState({ phase: 'starting', message: 'Starting the local Sub2API stack…' })
-    ensureStack().catch(() => {})
-  } else if (!cfg.enabled) {
-    setState({ phase: 'disabled', message: 'Disabled in configuration' })
-  }
+  // The persisted switches outrank the profile config: they are what the
+  // settings page edits, and the page must not be silently overruled by the
+  // YAML the user never re-opened.
+  loadPreferences().then(() => {
+    if (!cfg.enabled) {
+      setState({ phase: 'disabled', message: 'Disabled in configuration' })
+      return
+    }
+    if (prefs.autoStart) {
+      setState({ phase: 'starting', message: 'Starting the local Sub2API stack…' })
+      ensureStack().catch(() => {})
+    } else if (prefs.runtimeOn === false) {
+      setState({ phase: 'stopped', message: 'Stopped from the settings switch' })
+    } else {
+      // Not auto-started: the panel shows "Stopped" with a Start button.
+      setState({ phase: 'stopped', message: 'Idle — start it when you need it' })
+    }
+  }).catch((error) => {
+    log('warn', 'could not load preferences', error)
+  })
 
   log('info', `plugin active (data dir ${cfg.dataDir})`)
 }
