@@ -47,6 +47,28 @@ Sub2API 自身的上游账号、分组、渠道、API Key 等配置仍然在它�
 
 两个开关都持久化在 `<dataDir>/preferences.json`，**不需要改 YAML、不用重载插件**。设置页里的开关优先于 `cordis.patch.yml` 的 `autoStart`；想恢复「以 YAML 为准」，删掉 `preferences.json` 即可。
 
+## 从 Harness 导入厂商
+
+设置页下半部分有「**从 DeepSeek Harness 导入厂商**」：
+
+1. 点「扫描 Harness 厂商」——列出这个 Harness 里已配置的所有厂商、它们各自的模型，以及能不能导入。
+2. 勾厂商（可以只勾其中几个模型）。
+3. 点「导入所选」——每个厂商变成 Sub2API 里的**一个账号**，用同样的端点和密钥。
+
+导入后，这些厂商的模型就能通过本地 Sub2API 网关调用，和 Sub2API 自己的账号混在同一套转发里。
+
+**怎么拿到端点和密钥**：插件读的是 Harness 的 `llm` 服务（已解析的真实配置，不是某个 YAML 文件），端点/密钥来自可配置厂商目录的 `baseURL` / `baseURLEnv` / `nativeAuth.env`，再由 `credentials` 服务按同名 ref 解析——和 Harness 自己用的是同一套引用。
+
+**几条行为约定**：
+
+- **同名幂等**：账号名固定为 `Harness · <厂商显示名>`，重复导入是**就地重新同步**，不会产生重复账号。
+- **不可导入的会说明原因**：厂商没声明 base URL、或找不到密钥、或不提供模型时，会标成「无法导入」并给出原因，不会乱猜。
+- **需要服务已就绪**：账号是通过本地 Sub2API 管理接口创建的，服务没起时点导入会拒绝并提示（返回 409）。
+- **密钥不进浏览器**：密钥只在 Host 内部用于导入那次调用，前端拿到的枚举结果里不含密钥，只显示来源（如 `env:PIKAQIU_API_KEY`）。
+- **模型勾选会记住**：选择保存在 `<dataDir>/imported-providers.json`，下次打开页面还是上次的勾选。
+
+> 注意：需要 Harness 暴露 `llm` 服务；没有的话这一块会显示「导入功能需要 Harness 的 llm 服务」，不影响启动/停止等其余功能。
+
 ## 配置
 
 插件行 id 是 `local-sub2api`。在 Harness 配置目录的 `cordis.patch.yml`（本机为 `C:\Users\86158\.dsh\cordis.patch.yml` 或对应 profile 的 `cordis.patch.yml`）里覆盖同 id 行即可：
