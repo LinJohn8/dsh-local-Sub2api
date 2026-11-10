@@ -65,6 +65,30 @@ window.__ModuleLoader__.load({
         'settings.saved': 'Saved',
         'settings.port': 'Service port',
         'settings.proxy': 'Console proxy',
+        'import.title': 'Import providers from DeepSeek Harness',
+        'import.desc': 'Turn the model vendors already configured in Harness into Sub2API accounts, so the same endpoints and keys are callable through the local gateway. Existing accounts are re-synced by name, not duplicated.',
+        'import.scan': 'Scan Harness providers',
+        'import.rescan': 'Scan again',
+        'import.scanning': 'Scanning…',
+        'import.import': 'Import selected',
+        'import.importing': 'Importing…',
+        'import.selectAll': 'All',
+        'import.selectNone': 'None',
+        'import.models': 'models',
+        'import.selected': 'selected',
+        'import.notImportable': 'Not importable',
+        'import.noProviders': 'No providers found in this Harness.',
+        'import.needStack': 'Start the service first — accounts are created through the local Sub2API.',
+        'import.unavailable': 'Provider import needs the Harness llm service, which this build does not expose.',
+        'import.done': 'Import finished',
+        'import.created': 'created',
+        'import.updated': 'updated',
+        'import.skipped': 'skipped',
+        'import.failed': 'failed',
+        'import.error': 'failed',
+        'import.providerCount': 'providers',
+        'import.baseUrl': 'Endpoint',
+        'import.keySource': 'Key',
       },
       zh: {
         title: 'Local Sub2api',
@@ -111,6 +135,30 @@ window.__ModuleLoader__.load({
         'settings.saved': '已保存',
         'settings.port': '服务端口',
         'settings.proxy': '管理界面代理',
+        'import.title': '从 DeepSeek Harness 导入厂商',
+        'import.desc': '把 Harness 里已配置好的模型厂商，变成 Sub2API 的上游账号——同一套端点和密钥，通过本地网关也能调用。同名账号会就地重新同步，不会重复创建。',
+        'import.scan': '扫描 Harness 厂商',
+        'import.rescan': '重新扫描',
+        'import.scanning': '扫描中…',
+        'import.import': '导入所选',
+        'import.importing': '导入中…',
+        'import.selectAll': '全选',
+        'import.selectNone': '全不选',
+        'import.models': '个模型',
+        'import.selected': '已选',
+        'import.notImportable': '无法导入',
+        'import.noProviders': '这个 Harness 里没有找到厂商。',
+        'import.needStack': '先把服务打开再导入——账号是通过本地 Sub2API 创建的。',
+        'import.unavailable': '导入功能需要 Harness 的 llm 服务，当前这个版本没有暴露。',
+        'import.done': '导入完成',
+        'import.created': '新建',
+        'import.updated': '更新',
+        'import.skipped': '跳过',
+        'import.failed': '失败',
+        'import.error': '失败',
+        'import.providerCount': '个厂商',
+        'import.baseUrl': '端点',
+        'import.keySource': '密钥',
       },
     }
 
@@ -156,6 +204,34 @@ window.__ModuleLoader__.load({
       '.dsh-ls2a-set-state{display:inline-flex;align-items:center;gap:7px;padding:2px 10px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:12px;white-space:nowrap}',
       '.dsh-ls2a-set-meta{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--dsw-alias-label-secondary);font-size:12px}',
       '.dsh-ls2a-set-err{color:var(--dsw-alias-state-error-primary);font-size:12px;white-space:pre-wrap;word-break:break-word}',
+      // --- provider import ---
+      '.dsh-ls2a-imp{display:flex;flex-direction:column;gap:12px;margin-top:6px;padding-top:16px;border-top:1px solid var(--dsw-alias-border-l1)}',
+      '.dsh-ls2a-imp-head{display:flex;align-items:flex-start;gap:12px}',
+      '.dsh-ls2a-imp-head-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}',
+      '.dsh-ls2a-imp-title{font-weight:600}',
+      '.dsh-ls2a-imp-desc{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.55}',
+      '.dsh-ls2a-imp-list{display:flex;flex-direction:column;gap:8px}',
+      '.dsh-ls2a-imp-card{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1);overflow:hidden}',
+      '.dsh-ls2a-imp-card[data-importable="false"]{opacity:.62}',
+      '.dsh-ls2a-imp-row{display:flex;align-items:flex-start;gap:10px;padding:11px 14px;cursor:pointer}',
+      '.dsh-ls2a-imp-row:hover{background:var(--dsw-alias-bg-layer-2)}',
+      '.dsh-ls2a-imp-check{flex:none;width:15px;height:15px;margin-top:2px;accent-color:var(--dsw-alias-brand-primary);cursor:pointer}',
+      '.dsh-ls2a-imp-meta{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}',
+      '.dsh-ls2a-imp-name{font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
+      '.dsh-ls2a-imp-tag{font-size:11px;font-weight:400;padding:1px 7px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);white-space:nowrap}',
+      '.dsh-ls2a-imp-tag[data-tone="warn"]{color:var(--dsw-alias-state-warn-primary)}',
+      '.dsh-ls2a-imp-tag[data-tone="ok"]{color:var(--dsw-alias-state-success-primary)}',
+      '.dsh-ls2a-imp-sub{font-size:12px;color:var(--dsw-alias-label-secondary);word-break:break-all}',
+      '.dsh-ls2a-imp-reason{font-size:12px;color:var(--dsw-alias-state-warn-primary)}',
+      '.dsh-ls2a-imp-models{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px;max-height:190px;overflow:auto}',
+      '.dsh-ls2a-imp-chip{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:6px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-base);font-size:11px;cursor:pointer;white-space:nowrap}',
+      '.dsh-ls2a-imp-chip[data-on="true"]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}',
+      '.dsh-ls2a-imp-chip input{accent-color:var(--dsw-alias-brand-primary);margin:0}',
+      '.dsh-ls2a-imp-summary{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--dsw-alias-label-secondary)}',
+      '.dsh-ls2a-imp-summary b{font-weight:600;color:var(--dsw-alias-label-primary)}',
+      '.dsh-ls2a-imp-result{display:flex;flex-direction:column;gap:4px;font-size:12px}',
+      '.dsh-ls2a-imp-line{padding:6px 10px;border-radius:6px;background:var(--dsw-alias-bg-layer-2);display:flex;gap:8px;align-items:baseline}',
+      '.dsh-ls2a-imp-line[data-action="error"]{color:var(--dsw-alias-state-error-primary)}',
     ].join('\n')
 
     const ICON_PATH = 'M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v1A2.5 2.5 0 0 1 17.5 11h-11A2.5 2.5 0 0 1 4 8.5v-1Z'
@@ -392,6 +468,226 @@ window.__ModuleLoader__.load({
      * It also reports the live phase so the user can tell at a glance whether
      * the service is currently up.
      */
+    /**
+     * The provider-import card.
+     *
+     * Scan asks the Host to enumerate what the Harness can serve; the user ticks
+     * providers and per-provider models, then Import posts that selection and
+     * Sub2API ends up with one account per provider. Everything shown here comes
+     * from the Host's redacted enumeration — keys never reach the browser.
+     */
+    function ImportPanel(props) {
+      const { t, status, busy } = props
+      const [scan, setScan] = React.useState(null)
+      const [scanning, setScanning] = React.useState(false)
+      const [importing, setImporting] = React.useState(false)
+      const [error, setError] = React.useState(null)
+      const [result, setResult] = React.useState(null)
+      // provider -> { checked: bool, models: Set<modelId> }
+      const [choice, setChoice] = React.useState({})
+
+      const importAvailable = !status || status.importAvailable !== false
+      const stackReady = Boolean(status && status.phase === 'ready')
+
+      const post = React.useCallback(async (payload) => {
+        const response = await fetch(actionUrl(), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data && data.error ? data.error : `HTTP ${response.status}`)
+        return data
+      }, [])
+
+      const applyScan = React.useCallback((data) => {
+        setScan(data)
+        const next = {}
+        for (const provider of (data && data.providers) || []) {
+          const saved = Array.isArray(provider.selectedModels) ? provider.selectedModels : null
+          next[provider.provider] = {
+            checked: Boolean(provider.importable) && (saved === null || saved.length > 0),
+            models: new Set(saved === null ? provider.importedModels.map((m) => m.id) : saved),
+          }
+        }
+        setChoice(next)
+      }, [])
+
+      const scanNow = React.useCallback(async () => {
+        setScanning(true)
+        setError(null)
+        setResult(null)
+        try {
+          applyScan(await post({ action: 'list-harness-providers' }))
+        } catch (e) {
+          setError(e && e.message ? e.message : String(e))
+        } finally {
+          setScanning(false)
+        }
+      }, [applyScan, post])
+
+      React.useEffect(() => {
+        if (importAvailable && scan === null && !scanning) scanNow()
+      }, [importAvailable, scan, scanning, scanNow])
+
+      const providers = (scan && scan.providers) || []
+
+      const toggleProvider = (name, on) => {
+        setChoice((prev) => ({ ...prev, [name]: { ...prev[name], checked: on } }))
+      }
+      const toggleModel = (name, modelId, on) => {
+        setChoice((prev) => {
+          const current = prev[name] || { checked: true, models: new Set() }
+          const models = new Set(current.models)
+          if (on) models.add(modelId); else models.delete(modelId)
+          return { ...prev, [name]: { ...current, models, checked: models.size > 0 } }
+        })
+      }
+      const bulkModels = (name, all, on) => {
+        setChoice((prev) => {
+          const current = prev[name] || { checked: true, models: new Set() }
+          const provider = providers.find((p) => p.provider === name)
+          const models = on ? new Set((provider ? provider.importedModels : []).map((m) => m.id)) : new Set()
+          return { ...prev, [name]: { ...current, models, checked: on && models.size > 0 } }
+        })
+      }
+
+      const selectedProviders = providers.filter((p) => p.importable && choice[p.provider] && choice[p.provider].checked)
+      const totalModels = selectedProviders.reduce((sum, p) => sum + (choice[p.provider] ? choice[p.provider].models.size : 0), 0)
+
+      const doImport = async () => {
+        setImporting(true)
+        setError(null)
+        setResult(null)
+        try {
+          const models = {}
+          for (const provider of selectedProviders) {
+            const picked = choice[provider.provider]
+            if (picked) models[provider.provider] = Array.from(picked.models)
+          }
+          const data = await post({
+            action: 'import-providers',
+            providers: selectedProviders.map((p) => p.provider),
+            models,
+          })
+          setResult(data)
+        } catch (e) {
+          setError(e && e.message ? e.message : String(e))
+        } finally {
+          setImporting(false)
+        }
+      }
+
+      const disabled = importing || scanning || busy !== null
+
+      const summaryLine = []
+      if (scan && scan.available) {
+        summaryLine.push(h('span', { key: 'p' }, `${providers.length} ${t('import.providerCount')}`))
+        summaryLine.push(h('span', { key: 's' }, `${t('import.selected')} `, h('b', null, String(selectedProviders.length))))
+        summaryLine.push(h('span', { key: 'm' }, `${t('import.models')} `, h('b', null, String(totalModels))))
+      }
+
+      let body
+      if (!importAvailable) {
+        body = h('div', { className: 'dsh-ls2a-imp-reason' }, t('import.unavailable'))
+      } else if (scanning && scan === null) {
+        body = h('div', { className: 'dsh-ls2a-imp-desc' }, t('import.scanning'))
+      } else if (scan && !scan.available) {
+        body = h('div', { className: 'dsh-ls2a-imp-reason' }, scan.reason || t('import.unavailable'))
+      } else if (providers.length === 0) {
+        body = h('div', { className: 'dsh-ls2a-imp-desc' }, t('import.noProviders'))
+      } else {
+        body = h('div', { className: 'dsh-ls2a-imp-list' }, providers.map((provider) => {
+          const picked = choice[provider.provider] || { checked: false, models: new Set() }
+          const importable = Boolean(provider.importable)
+          return h('div', {
+            key: provider.provider,
+            className: 'dsh-ls2a-imp-card',
+            'data-importable': importable ? 'true' : 'false',
+          },
+            h('label', { className: 'dsh-ls2a-imp-row' },
+              h('input', {
+                type: 'checkbox',
+                className: 'dsh-ls2a-imp-check',
+                checked: Boolean(picked.checked),
+                disabled: !importable,
+                onChange: (event) => toggleProvider(provider.provider, event.target.checked),
+              }),
+              h('div', { className: 'dsh-ls2a-imp-meta' },
+                h('div', { className: 'dsh-ls2a-imp-name' },
+                  h('span', null, provider.displayName || provider.provider),
+                  h('span', { className: 'dsh-ls2a-imp-tag' }, provider.provider),
+                  h('span', {
+                    className: 'dsh-ls2a-imp-tag',
+                    'data-tone': importable ? 'ok' : 'warn',
+                  }, importable
+                    ? `${provider.importedModels.length} ${t('import.models')}`
+                    : t('import.notImportable'))),
+                provider.baseUrl ? h('div', { className: 'dsh-ls2a-imp-sub' }, `${t('import.baseUrl')}: ${provider.baseUrl}`) : null,
+                provider.keySource ? h('div', { className: 'dsh-ls2a-imp-sub' }, `${t('import.keySource')}: ${provider.keySource}`) : null,
+                !importable && provider.reason ? h('div', { className: 'dsh-ls2a-imp-reason' }, provider.reason) : null)),
+            importable ? h('div', { className: 'dsh-ls2a-imp-models' },
+              h('label', { className: 'dsh-ls2a-imp-chip', 'data-on': picked.models.size === provider.importedModels.length ? 'true' : 'false' },
+                h('input', {
+                  type: 'checkbox',
+                  checked: picked.models.size === provider.importedModels.length && provider.importedModels.length > 0,
+                  onChange: (e) => bulkModels(provider.provider, true, e.target.checked),
+                }),
+                t('import.selectAll')),
+              provider.importedModels.map((model) => h('label', {
+                key: model.id,
+                className: 'dsh-ls2a-imp-chip',
+                'data-on': picked.models.has(model.id) ? 'true' : 'false',
+              },
+              h('input', {
+                type: 'checkbox',
+                checked: picked.models.has(model.id),
+                onChange: (event) => toggleModel(provider.provider, model.id, event.target.checked),
+              }),
+              model.name && model.name !== model.id ? `${model.name} (${model.id})` : model.id))) : null)
+        }))
+      }
+
+      return h('div', { className: 'dsh-ls2a-imp' },
+        h('div', { className: 'dsh-ls2a-imp-head' },
+          h('div', { className: 'dsh-ls2a-imp-head-main' },
+            h('div', { className: 'dsh-ls2a-imp-title' }, t('import.title')),
+            h('div', { className: 'dsh-ls2a-imp-desc' }, t('import.desc')),
+            summaryLine.length > 0 ? h('div', { className: 'dsh-ls2a-imp-summary' }, summaryLine) : null),
+          h('div', { className: 'dsh-ls2a-set-row-side' },
+            h('button', {
+              type: 'button',
+              className: 'dsh-ls2a-btn',
+              disabled: disabled,
+              onClick: scanNow,
+            }, scan === null ? t('import.scan') : t('import.rescan')),
+            h('button', {
+              type: 'button',
+              className: 'dsh-ls2a-btn',
+              'data-variant': 'primary',
+              disabled: disabled || !stackReady || selectedProviders.length === 0,
+              title: stackReady ? '' : t('import.needStack'),
+              onClick: doImport,
+            }, importing ? t('import.importing') : t('import.import')))),
+
+        !stackReady ? h('div', { className: 'dsh-ls2a-imp-reason' }, t('import.needStack')) : null,
+        body,
+        error ? h('div', { className: 'dsh-ls2a-error' }, error) : null,
+        result && Array.isArray(result.results) && result.results.length > 0
+          ? h('div', { className: 'dsh-ls2a-imp-result' },
+            h('div', { className: 'dsh-ls2a-imp-title' }, t('import.done')),
+            result.results.map((line) => h('div', {
+              key: `${line.provider}-${line.action}`,
+              className: 'dsh-ls2a-imp-line',
+              'data-action': line.action,
+            },
+            h('b', null, line.name || line.provider),
+            h('span', null, t(`import.${line.action}`) || line.action),
+            typeof line.models === 'number' ? h('span', null, `${line.models} ${t('import.models')}`) : null,
+            h('span', null, line.message || ''))))
+          : null)
+    }
+
     function createSettingsSection(t) {
       return function LocalSub2apiSettings() {
         const [status, setStatus] = React.useState(null)
@@ -504,7 +800,10 @@ window.__ModuleLoader__.load({
               status && status.sub2apiPort ? h('span', null, `${t('settings.port')} ${status.sub2apiPort}`) : null,
               status && status.proxyPort ? h('span', null, `${t('settings.proxy')} ${status.proxyPort}`) : null),
             status && status.error ? h('div', { className: 'dsh-ls2a-error' }, status.error) : null,
-            status && status.hint ? h('div', { className: 'dsh-ls2a-hint' }, status.hint) : null))
+            status && status.hint ? h('div', { className: 'dsh-ls2a-hint' }, status.hint) : null,
+
+            h(ImportPanel, { t, status, runAction, busy }),
+          ))
       }
     }
 

@@ -28,8 +28,15 @@ import os from 'node:os'
 import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import * as adapter from './lib/adapter.js'
+import { collectHarnessProviders, redactProviders } from './lib/harness-providers.js'
 
 export const name = 'local-sub2api'
+/**
+ * Only `webServer` is a hard dependency: start/stop/console must keep working on
+ * any Harness build. The provider-import feature needs `llm` and `credentials`,
+ * so it resolves those through `ctx.get()` and reports itself unavailable when
+ * they are missing, instead of failing the whole plugin's mount.
+ */
 export const inject = ['webServer']
 
 const PACKAGE_DIR = path.dirname(fileURLToPath(import.meta.url))
@@ -453,6 +460,14 @@ export function apply(ctx, rawConfig) {
   // effect on the next launch without a plugin remount.
   const prefsPath = path.join(cfg.dataDir, 'preferences.json')
   let prefs = { autoStart: cfg.autoStart }
+  /**
+   * Provider-import bookkeeping, keyed by Harness provider route: which of its
+   * models the user chose to expose through Sub2API. Persisted with the other
+   * preferences so a re-import offers the same selection instead of starting
+   * over.
+   */
+  const importPath = path.join(cfg.dataDir, 'imported-providers.json')
+  let importSelection = {}
   let envValues = null
   let authSession = null
   let authFetchedAt = 0
@@ -498,6 +513,183 @@ export function apply(ctx, rawConfig) {
       await fsp.writeFile(prefsPath, `${JSON.stringify(prefs, null, 2)}\n`, 'utf8')
     } catch (error) {
       log('warn', 'could not persist preferences', error)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // provider import ("把 Harness 里的厂商导入 Sub2API")
+  // ---------------------------------------------------------------------------
+
+  /** Load the remembered per-provider model selection. */
+  async function loadImportSelection() {
+    try {
+      const parsed = JSON.parse(await fsp.readFile(importPath, 'utf8'))
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) importSelection = parsed
+    } catch { /* nothing imported yet */ }
+  }
+
+  /** Remember which models of one provider the user chose. */
+  async function saveImportSelection() {
+    try {
+      await fsp.mkdir(cfg.dataDir, { recursive: true })
+      await fsp.writeFile(importPath, `${JSON.stringify(importSelection, null, 2)}\n`, 'utf8')
+    } catch (error) {
+      log('warn', 'could not persist the import selection', error)
+    }
+  }
+
+  /**
+   * Import the chosen Harness providers into Sub2API as accounts, one account
+   * per provider. Idempotent by account name: an existing account is updated in
+   * place (endpoint + key are re-synced, since the Harness is the source of
+   * truth) rather than duplicated.
+   *
+   * @param {{providers?: string[], models?: Record<string, string[]>}} request
+   *   Provider routes to import; omitted means every importable provider. Each
+   *   entry is the account name Sub2API will show.
+   */
+  async function importHarnessProviders(request = {}) {
+    const wanted = Array.isArray(request.providers) ? request.providers : null
+    const modelChoice = request.models && typeof request.models === 'object' ? request.models : {}
+
+    // Enumerate once, un-redacted: this is the only place a resolved key is
+    // allowed to exist, and it goes straight into the Sub2API admin call.
+    const llm = ctx.get('llm')
+    if (!llm) return { ok: false, error: '这个 Harness 没有 llm 服务，无法枚举厂商', results: [] }
+    const full = await collectHarnessProviders({ llm, credentials: ctx.get('credentials'), env: process.env })
+
+    const session = await loginAdmin()
+    const authHeaders = {
+      Authorization: `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+    const listUrl = `${upstreamBase()}/api/v1/admin/accounts?page=1&page_size=200`
+    const list = await httpJson(listUrl, { method: 'GET', headers: authHeaders, timeoutMs: 20000 })
+    const existing = list.statusCode === 200 && list.json && list.json.data && Array.isArray(list.json.data.items)
+      ? list.json.data.items
+      : []
+
+    const results = []
+    for (const provider of full) {
+      if (wanted && !wanted.includes(provider.provider)) continue
+      const name = `Harness · ${provider.displayName}`.slice(0, 60)
+
+      if (!provider.importable) {
+        results.push({
+          provider: provider.provider,
+          name,
+          action: 'skipped',
+          message: provider.reason || 'not importable',
+        })
+        continue
+      }
+
+      // The chosen model subset: an explicit list wins; empty means all of them.
+      const chosen = Array.isArray(modelChoice[provider.provider])
+        ? modelChoice[provider.provider]
+        : provider.importedModels.map((model) => model.id)
+      const models = provider.importedModels
+        .filter((model) => chosen.includes(model.id))
+        .map((model) => ({
+          id: model.id,
+          name: model.name,
+          ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
+          ...(model.maxTokens ? { maxTokens: model.maxTokens } : {}),
+          ...(model.inputModalities ? { input: model.inputModalities } : {}),
+        }))
+
+      const body = {
+        name,
+        platform: 'openai',
+        type: 'apikey',
+        credentials: { base_url: provider.baseUrl, api_key: provider._key },
+        concurrency: 3,
+        priority: 50,
+        // Sub2API keeps a per-account model list; it is what its own
+        // `/accounts/{id}/models` surfaces and what the gateway advertises.
+        extra: { harness_provider: provider.provider, harness_models: models },
+      }
+
+      const found = existing.find((item) => String(item.name).trim() === name)
+      try {
+        if (found) {
+          const updateUrl = `${upstreamBase()}/api/v1/admin/accounts/${found.id}`
+          const updated = await httpJson(updateUrl, { method: 'PUT', headers: authHeaders, body, timeoutMs: 30000 })
+          if (updated.statusCode === 200 && updated.json && updated.json.code === 0) {
+            results.push({
+              provider: provider.provider, name, action: 'updated',
+              message: `account #${found.id} re-synced`, models: models.length,
+            })
+          } else {
+            results.push({
+              provider: provider.provider, name, action: 'error',
+              message: `update HTTP ${updated.statusCode}: ${firstLine(updated.text || '')}`,
+            })
+          }
+        } else {
+          const createUrl = `${upstreamBase()}/api/v1/admin/accounts`
+          const created = await httpJson(createUrl, { method: 'POST', headers: authHeaders, body, timeoutMs: 30000 })
+          if (created.statusCode === 200 && created.json && created.json.code === 0) {
+            const id = created.json.data && created.json.data.id
+            results.push({
+              provider: provider.provider, name, action: 'created',
+              message: id ? `account #${id}` : 'created', models: models.length,
+            })
+          } else {
+            results.push({
+              provider: provider.provider, name, action: 'error',
+              message: `create HTTP ${created.statusCode}: ${firstLine(created.text || '')}`,
+            })
+          }
+        }
+      } catch (error) {
+        results.push({
+          provider: provider.provider, name, action: 'error',
+          message: error && error.message ? error.message : String(error),
+        })
+      }
+
+      // Remember the selection even when Sub2API errored, so a retry is cheap.
+      importSelection[provider.provider] = { models: chosen, at: Date.now() }
+    }
+
+    await saveImportSelection()
+    return { ok: true, results }
+  }
+
+
+  /**
+   * Enumerate the Harness's own providers. Resolves `llm`/`credentials` lazily
+   * so a build without them degrades to "feature unavailable" instead of a
+   * failed mount.
+   */
+  async function readHarnessProviders() {
+    const llm = ctx.get('llm')
+    if (!llm) {
+      return { available: false, reason: '这个 Harness 没有 llm 服务，无法枚举厂商', providers: [] }
+    }
+    try {
+      const providers = await collectHarnessProviders({
+        llm,
+        credentials: ctx.get('credentials'),
+        env: process.env,
+      })
+      // Attach the remembered selection so the UI opens where the user left it.
+      const withSelection = providers.map((provider) => {
+        const saved = importSelection[provider.provider]
+        const allIds = provider.importedModels.map((model) => model.id)
+        const selected = Array.isArray(saved && saved.models)
+          ? saved.models.filter((id) => allIds.includes(id))
+          : allIds
+        return { ...provider, selectedModels: selected }
+      })
+      return { available: true, providers: redactProviders(withSelection) }
+    } catch (error) {
+      return {
+        available: false,
+        reason: error && error.message ? error.message : String(error),
+        providers: [],
+      }
     }
   }
 
@@ -1022,6 +1214,8 @@ export function apply(ctx, rawConfig) {
       // `runtimeOn` is whether the user wants the service up right now.
       autoStart: prefs.autoStart,
       runtimeOn: prefs.runtimeOn !== false,
+      // Whether the provider-import feature can run on this Harness build.
+      importAvailable: Boolean(ctx.get('llm')),
       adapter: {
         enabled: cfg.adapterEnabled,
         autoProvision: cfg.adapterAutoProvision,
@@ -1099,6 +1293,49 @@ export function apply(ctx, rawConfig) {
       }
       return
     }
+    if (action === 'list-harness-providers') {
+      // Read-only enumeration: what the Harness can serve, and what of it is
+      // importable. Never starts the stack and never writes.
+      try {
+        const enumerated = await readHarnessProviders()
+        sendJson(response, 200, {
+          ...enumerated,
+          stackReady: state.phase === 'ready',
+        })
+      } catch (error) {
+        sendJson(response, 500, { error: String(error && error.message ? error.message : error) })
+      }
+      return
+    }
+    if (action === 'import-providers') {
+      // The import button. Requires a running stack because the accounts are
+      // created through the local Sub2API admin API.
+      if (state.phase !== 'ready') {
+        sendJson(response, 409, { error: '本地 Sub2API 还没就绪，先把服务打开再导入。', phase: state.phase })
+        return
+      }
+      try {
+        const result = await importHarnessProviders({
+          providers: Array.isArray(payload.providers) ? payload.providers : undefined,
+          models: payload.models && typeof payload.models === 'object' ? payload.models : undefined,
+        })
+        sendJson(response, result.ok ? 200 : 500, { ...result, ...statusPayload() })
+      } catch (error) {
+        sendJson(response, 500, { ok: false, error: String(error && error.message ? error.message : error) })
+      }
+      return
+    }
+    if (action === 'save-import-selection') {
+      // Remember the ticked models without importing, so reopening the page
+      // shows the same choice.
+      const models = payload.models && typeof payload.models === 'object' ? payload.models : {}
+      for (const [provider, ids] of Object.entries(models)) {
+        if (Array.isArray(ids)) importSelection[provider] = { models: ids, at: Date.now() }
+      }
+      await saveImportSelection()
+      sendJson(response, 200, { ok: true, saved: Object.keys(models).length })
+      return
+    }
     sendJson(response, 400, { error: `unknown action: ${action || '(empty)'}` })
   }
 
@@ -1166,6 +1403,9 @@ export function apply(ctx, rawConfig) {
       // Not auto-started: the panel shows "Stopped" with a Start button.
       setState({ phase: 'stopped', message: 'Idle — start it when you need it' })
     }
+    // The remembered model selection is read once; a failure only costs the
+    // pre-ticked state, never the feature.
+    loadImportSelection().catch(() => {})
   }).catch((error) => {
     log('warn', 'could not load preferences', error)
   })

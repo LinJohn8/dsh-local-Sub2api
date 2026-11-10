@@ -25,6 +25,7 @@
   "files": [
     "index.js",
     "client.js",
+    "lib/**/*.js",
     "runtime/docker-compose.local.yml",
     "cordis.patch.yml",
     "locale/*.json",
